@@ -49,7 +49,7 @@ start:
     ; Inicializa esi com o endereço do nome do arquivo
     mov esi, offset file_name
 
-    ; Tratamento de string (essa parte do código está faltando detalhes específicos)
+    ; Tratamento de string
 
     mov esi, offset file_name ; Armazenar apontador da string em esi
     proximo:
