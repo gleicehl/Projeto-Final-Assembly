@@ -5,24 +5,23 @@ option casemap:none
 include \masm32\include\windows.inc
 include \masm32\include\kernel32.inc
 include \masm32\include\masm32.inc
-includelib \masm32\lib\kernel32.lib ;biblioteca p/ usar CreateFile
-includelib \masm32\lib\masm32.lib   ;biblioteca p/ usar StrLen
-
+includelib \masm32\lib\kernel32.lib
+includelib \masm32\lib\masm32.lib
 
 .data
-;entrada e saída
-file_name_request db "Insira o nome do arquivo .bmp: ", 0h
-file_name db 10 dup(0)  ;string p nome de arq
-x_request db "Valor de X: ", 0h
-X db 0
-y_request db "Valor de Y: ", 0h
-Y db 0
-altura_request db "Altura: ", 0h
-altura db 0
-largura_request db "Largura: ", 0h
-largura db 0
+; entrada e saÃ­da
+file_name_request db "Insira o nome do arquivo .bmp: ", 0
+file_name db 260 dup(0)  ; string para nome do arquivo
+x_request db "Valor de X: ", 0
+X dd 0
+y_request db "Valor de Y: ", 0
+Y dd 0
+altura_request db "Altura: ", 0
+altura dw 0
+largura_request db "Largura: ", 0
+largura dw 0
 
-;handles
+; handles
 fileHandle HANDLE 0
 inputHandle dd 0
 outputHandle dd 0
@@ -35,62 +34,88 @@ imageBuffer db 6480 dup(0)
 
 .code
 start:
+    ; ObtÃ©m os handles de entrada e saÃ­da padrÃ£o
     invoke GetStdHandle, STD_INPUT_HANDLE
     mov inputHandle, eax
     invoke GetStdHandle, STD_OUTPUT_HANDLE
     mov outputHandle, eax
-    
-    invoke WriteConsole, outputHandle, addr file_name_request, sizeof file_name_request, console_count, NULL
-    invoke ReadConsole, inputHandle, addr file_name, sizeof file_name, addr console_count, NULL ; recebe o nome do arquivo
 
-    mov esi, offset file_name   ; mov endereço de file_name pra ESI p/ conversão em dword
+    ; Escreve a solicitaÃ§Ã£o para inserir o nome do arquivo .bmp
+    invoke WriteConsole, outputHandle, addr file_name_request, 31, NULL, NULL
 
-    ; tratamento de string aqui
-    
-    invoke WriteConsole, outputHandle, addr x_request, sizeof x_request, console_count, NULL
-    invoke ReadConsole, inputHandle,  addr X, 4, console_count, NULL ; pede e lê X
+    ; LÃª o nome do arquivo .bmp inserido pelo usuÃ¡rio
+    invoke ReadConsole, inputHandle, addr file_name, 260, addr console_count, NULL
 
-    invoke WriteConsole, outputHandle, addr y_request, sizeof y_request, console_count, NULL
-    invoke ReadConsole, inputHandle, addr Y, 4, console_count, NULL ; pede e lê Y
+    ; Inicializa esi com o endereÃ§o do nome do arquivo
+    mov esi, offset file_name
 
-    invoke WriteConsole, outputHandle, addr largura, sizeof largura, console_count, NULL
-    invoke ReadConsole, inputHandle, addr largura, 4, console_count, NULL ; pede e lê a largura
+    ; Tratamento de string (essa parte do cÃ³digo estÃ¡ faltando detalhes especÃ­ficos)
 
-    invoke WriteConsole, outputHandle, addr altura, sizeof altura, console_count, NULL
-    invoke ReadConsole, inputHandle, addr altura, 4, console_count, NULL ; pede e lê a altura
+    mov esi, offset file_name ; Armazenar apontador da string em esi
+    proximo:
+    mov al, [esi] ; Mover caractere atual para al
+    inc esi ; Apontar para o proximo caractere
+    cmp al, 13 ; Verificar se eh o caractere ASCII CR - FINALIZAR
+    jne proximo
+    dec esi ; Apontar para caractere anterior
+    xor al, al ; ASCII 0
+    mov [esi], al ; Inserir ASCII 0 no lugar do ASCII CR
 
-    ; lê o arquivo e passa ele para var fileHandle
+    ; Solicita e lÃª o valor de X
+    invoke WriteConsole, outputHandle, addr x_request, 11, NULL, NULL
+    invoke ReadConsole, inputHandle, addr X, 4, addr console_count, NULL
+
+    ; Solicita e lÃª o valor de Y
+    invoke WriteConsole, outputHandle, addr y_request, 11, NULL, NULL
+    invoke ReadConsole, inputHandle, addr Y, 4, addr console_count, NULL
+
+    ; Solicita e lÃª o valor da largura
+    invoke WriteConsole, outputHandle, addr largura_request, 10, NULL, NULL
+    invoke ReadConsole, inputHandle, addr largura, 4, addr console_count, NULL
+
+    ; Solicita e lÃª o valor da altura
+    invoke WriteConsole, outputHandle, addr altura_request, 8, NULL, NULL
+    invoke ReadConsole, inputHandle, addr altura, 4, addr console_count, NULL
+
+    ; Cria o arquivo com os parÃ¢metros fornecidos
     invoke CreateFile, addr file_name, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0
     mov fileHandle, eax
 
-    invoke ReadFile, fileHandle, addr headerBuffer, 18, addr byteCount, 0 ; lê os primeiros 18 bytes
-    invoke WriteFile, eax, addr headerBuffer, 18, addr byteCount, 0 ; escreve no arquivo de saída
+    ; LÃª os primeiros 18 bytes do arquivo e escreve-os no arquivo de saÃ­da
+    invoke ReadFile, fileHandle, addr headerBuffer, 18, addr byteCount, 0
+    invoke WriteFile, outputHandle, addr headerBuffer, 18, addr byteCount, 0
 
-    invoke ReadFile, fileHandle, addr largura, 4, addr byteCount, 0 ; lê o tamanho da largura
-    invoke WriteFile, eax, addr largura, 4, addr byteCount, 0 ; escreve no arquivo de saída
-
+    ; LÃª os prÃ³ximos 28 bytes do cabeÃ§alho e escreve-os no arquivo de saÃ­da
     mov eax, 32
     sub eax, 4
-    invoke ReadFile, fileHandle, addr headerBuffer, eax, addr byteCount, 0 ; lê os 32 bytes restantes do cabeçalho
-    invoke WriteFile, eax, addr headerBuffer, eax, addr byteCount, 0 ; escreve no arquivo de saída
+    invoke ReadFile, fileHandle, addr headerBuffer, eax, addr byteCount, 0
+    invoke WriteFile, outputHandle, addr headerBuffer, eax, addr byteCount, 0
 
-    mov ecx, offset largura ; move valor de largura p/ ecx -> multiplica por 3 p/ calcular o número de bytes a serem lidos -> move valor para edx
-    imul ecx, 3 ; calcula o número total de bytes a serem lidos
+    ; Converte a altura e a largura em 32 bits e multiplica-as por 3 para obter o nÃºmero total de bytes a serem lidos
+    movzx ecx, word ptr largura
+    movzx eax, word ptr altura
+    imul ecx, eax
+    imul ecx, 3
     mov edx, 0
-    
- 
 
-readLoop:
-    invoke ReadFile, fileHandle, addr imageBuffer, 6480, addr byteCount, 0 ; lê os bytes da imagem
-    invoke WriteFile, eax, addr imageBuffer, byte_count, addr byteCount, 0 ; escreve no arquivo de saída
+    ; Mova o ponteiro do arquivo para a posiÃ§Ã£o correta para ler os dados da imagem
+    invoke SetFilePointer, fileHandle, 54, NULL, FILE_BEGIN
 
-    sub ecx, byteCount
-    jnz readLoop ; repete o loop até que byteCount e ecx sejam iguais
+    readLoop:
+        ; LÃª o arquivo em partes e escreve o conteÃºdo no arquivo de saÃ­da
+        invoke ReadFile, fileHandle, addr imageBuffer, 6480, addr byteCount, 0
+        invoke WriteFile, outputHandle, addr imageBuffer, byteCount, addr byteCount, 0
 
+        ; Subtrai a quantidade de bytes lidos do nÃºmero total de bytes a serem lidos e continua o loop se necessÃ¡rio
+        sub ecx, byteCount
+        jnz readLoop
+
+    ; Fecha o arquivo
     invoke CloseHandle, fileHandle
 
-end start
-invoke ExitProcess, 0
+    ; Finaliza o processo
+    invoke ExitProcess, 0
 
+end start
 
 
